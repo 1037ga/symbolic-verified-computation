@@ -368,12 +368,12 @@ def main(ode,init,n):
     e_range = sympy.Interval(-oo,oo)
     approach_value = Rational(0,1)
     approach_interval = sympy.Interval.open(approach_value,approach_value+Rational(1,10**10))
-    print('dx/dt =',ode,'\n')
 
     # 近似解の生成 
     init_length = len(init)
     expr1 = picard(ode,init,n)
     for i in range(init_length):
+        print('d'+str(x[i])+'/dt = '+str(ode[i]))
         print(str(x[i])+'(t) =',expand(expr1[x[i]]))
         itv()
         print(str(x[i])+'(0) =',str(init[i]),'=',eval(str(init[i])),'\n')
@@ -426,13 +426,13 @@ def main(ode,init,n):
     for i in range(init_length):
         expr3[i] = expand(ode[i].subs(expr1),t)
         coeffs[i] = polynomial_coefficients(expr3[i],t)
-    print('1 回目')
+    print('----- 1 -----')
     tmp = Guaranteed_accuracy(tmp,coeffs,degree_n)
     if isinstance(tmp,bool):
         return 0
     else:
         for i in range(1,3):
-            print(str(i+1)+' 回目')
+            print('----- '+str(i+1)+' -----')
             tmp = Guaranteed_accuracy(tmp,coeffs,degree_n)
     print()
     for i in range(init_length):
@@ -480,7 +480,7 @@ def itv():
 if __name__ == "__main__":
     # logging.basicConfig(level=logging.DEBUG, format='%(levelname)s: %(message)s')
     sym()
-    ode = [-c+x[1],-a]
+    ode = [e+x[1],-Rational(98,10)]
     init = [10,0]
-    n = 3
+    n = 2
     main(ode,init,n)
