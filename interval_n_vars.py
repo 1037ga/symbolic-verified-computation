@@ -369,6 +369,8 @@ def main(ode,init,n):
     approach_value = Rational(0,1)
     approach_interval = sympy.Interval.open(approach_value,approach_value+Rational(1,10**10))
 
+    print(type(ode[1]))
+
     # 近似解の生成 
     init_length = len(init)
     expr1 = picard(ode,init,n)
@@ -472,15 +474,15 @@ def itv():
     具体値はRationalで与える
     """
     global t,a,b,c
-    t = Interval(0,Rational(1,1))
-    a = Interval(Rational(98,10),Rational(98,10))
+    t = Interval(0,e)
+    a = Interval(Rational(1,1)-e,Rational(1,1)+e)
     b = Interval(5,5)
     c = Interval(e,e)
 
 if __name__ == "__main__":
     # logging.basicConfig(level=logging.DEBUG, format='%(levelname)s: %(message)s')
     sym()
-    ode = [e+x[1],-Rational(98,10)]
-    init = [10,0]
+    ode = [-e*x[1]+x[1],-Rational(98,10)]
+    init = [1,1]
     n = 2
     main(ode,init,n)

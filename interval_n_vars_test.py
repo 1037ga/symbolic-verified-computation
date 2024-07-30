@@ -2,9 +2,10 @@ import sympy
 import sympy.sets
 from sympy import *
 from sympy.solvers.solveset import solvify
-from tabulate import tabulate
 import logging
 import time
+import sys
+from continued_fraction import *
 
 class Interval:
     def __init__(self, lower, upper):
@@ -196,15 +197,13 @@ def abs(expr):
         return -expr
     else:
         raise ValueError('abs_error'+'\n'+str(expr))
-
-def sym():
-    """
-    symbolic変数の更新
-    """
-    global e,t,a,b,c,x,syms
-    e,t,a,b,c,x = symbols('e t a b c x')
-    e = Symbol('e', real = true)
-    syms = [e,t,a,b,c,x]
+    
+def pprint(expr):
+    expr = str(expr)
+    expr = expr.replace('**','^')
+    expr = expr.replace('*','')
+    expr = expr.replace('e','ε')
+    print(expr)
 
 def horner(coefficients, t):
     """
@@ -218,68 +217,89 @@ def horner(coefficients, t):
         result = result * t + coeff
     return result
 
-def picard(ode,init,deg):
-    P = sympy.Function('P')
-    P = ode #常微分方程式の右辺
-    Q = sympy.Function('Q')
-    Q = init #関数x(t)の初期値
-    n = deg #最高次数
+def picard(ode,init,deg): 
+    tmp = [0 for _ in range(len(init))]
+    n = deg
+    values = dict()
+    for i in range(len(init)):
+        values[x[i]] = init[i]
 
     for i in range(n):
-        if degree(P,x) != 0:
-            Q = init + integrate(P.subs(x,Q),t)
-        else:
-            Q = init + integrate(P,t)
-        while((degree(Q,t)>i+1)):
-            Q = Q-LT(Q)
+        for j in range(len(init)):
+            tmp[j] = init[j] + integrate(ode[j].subs(values),t)
+        for j in range(len(init)):
+            while(degree(tmp[j],t)>i+1):
+                tmp[j] = tmp[j]-LT(tmp[j])
+            values[x[j]] = tmp[j]
 
-    return Q
+    return values
     
         
-def Guaranteed_accuracy(v_c,coefficients):
-    itv()
-    ans = [0 for _ in range(len(coefficients))]
-    print(coefficients)
-    for i in range(len(coefficients)):
-        ans[len(coefficients)-i-1] = eval(str(coefficients[i]))
-    v = Interval.expand(degree_n+(Rational(1,n+1)*horner(ans[n:],t))*t)
-    ans = Interval.subset(v,v_c)
-    tmp = [v.lower,v.upper,v_c.lower,v_c.upper,ans]
-    output_table.append(tmp)
-    if ans == False:   
+def Guaranteed_accuracy(v_c,coefficients,degree_n):
+    t,a,b,c = itv_list
+    length = len(coefficients)
+    v_c0,v_c1,v_c2,v_c3,v_c4,v_c5,v_c6,v_c7,v_c8,v_c9 = v_c
+    Ans = [0 for _ in range(length)]
+    for i in range(length):
+        t,a,b,c = itv_list
+        ans = [0 for _ in range(len(coefficients[i]))]
+        for j in range(len(coefficients[i])):
+            ans[j] = eval(str(coefficients[i][j]))
+        ans.reverse()
+        Ans[i] = ans
+    is_subset = [0 for _ in range(length)]
+    v = [0 for _ in range(10)]
+    for i in range(length):
+        if Ans[i][n:] == []:
+            v[i] = degree_n[i]+0*t
+        else:
+            v[i] = Interval.expand(degree_n[i]+(Rational(1,n+1)*horner(Ans[i][n:],t))*t)
+            coeffs_lower = poly_to_coeffs(v[i].lower,e)
+            coeffs_lower.reverse()
+            coeffs_lower = polynomial_continued_fraction(coeffs_lower,31)
+            coeffs_upper = poly_to_coeffs(v[i].upper,e)
+            coeffs_upper.reverse()
+            coeffs_upper = polynomial_continued_fraction(coeffs_upper,32)
+            v[i] = Interval(coeffs_to_poly(coeffs_lower,e),coeffs_to_poly(coeffs_upper,e))
+        print('v_c'+str(i),'= ',v_c[i])
+        print(' v'+str(i),' = ',v[i])
+        is_subset[i] = Interval.subset(v[i],v_c[i])
+        print('v'+str(i),'⊆','v_c'+str(i),'=',is_subset[i],'\n')
+    if False in is_subset:
         return False
     else:
         return v
-           
-def polynomial_coefficients(expr,t):
-    expr = poly(expr,t)
+    
+def poly_to_coeffs(expr,var):
+    expr = poly(expr,var)
     coefficients = expr.all_coeffs()
     return coefficients
 
-def output(output_table,option=0):
-    if option == 0:
-        header = ['num','V.lower','V.upper','V_c.lower','V_c.upper','V ⊆ V_c']
-        print(tabulate(output_table, headers=header),'\n')
-    else:
-        for o in output_table:
-            print(o[0],'回目')
-            print('V = '+'['+str(o[1])+', '+str(o[2])+']')
-            print('V_c = '+'['+str(o[3])+', '+str(o[4])+']')
-            print('V ⊆ V_c =',o[5],'\n')
-
-def sympy_interval_to_inequality(itv,var):
+def sympy_interval_to_inequality(itv,var,decimal = false):
     """
     sympy.Interval型の変数 itv を var の不等式(str型)にして返す関数
     """
     if isinstance(itv,(sympy.Interval)):
-        if itv.is_open:
-            return str(itv.inf)+' < '+ var +' < '+str((itv.sup))
-        elif itv.left_open:
-            return str(itv.inf)+' < '+ var +' ≦ '+str((itv.sup))
-        elif itv.right_open:
-            return str(itv.inf)+' ≦ '+ var +' < '+str((itv.sup))
+        if decimal == False:
+            if itv.is_open:
+                return str(itv.inf)+' < '+ var +' < '+str((itv.sup))
+            elif itv.left_open:
+                return str(itv.inf)+' < '+ var +' ≦ '+str((itv.sup))
+            elif itv.right_open:
+                return str(itv.inf)+' ≦ '+ var +' < '+str((itv.sup))
+            else:
+                return str(itv.inf)+' ≦ '+ var +' ≦ '+str((itv.sup))
         else:
-            return str(itv.inf)+' ≦ '+ var +' ≦ '+str((itv.sup))
+            inf = itv.inf.evalf(20)
+            sup = itv.sup.evalf(20)
+            if itv.is_open:
+                return str(inf)+' < '+ var +' < '+str((sup))
+            elif itv.left_open:
+                return str(inf)+' < '+ var +' ≦ '+str((sup))
+            elif itv.right_open:
+                return str(inf)+' ≦ '+ var +' < '+str((sup))
+            else:
+                return str(inf)+' ≦ '+ var +' ≦ '+str((sup))
     elif isinstance(itv,(Union)):
         return str(itv)
     elif isinstance(itv,FiniteSet):
@@ -306,7 +326,6 @@ def compare_polynomials(expr):
     expr: 不等式
     """
     global e_range
-
     if isinstance(expr,bool):
         return expr
     if isinstance(expr,sympy.logic.boolalg.BooleanTrue):
@@ -342,91 +361,191 @@ def compare_polynomials(expr):
             logging.debug(str(True)+'\n')
             return True
         else:
-            e_range = ans
+            if ans.sup.has(CRootOf):
+                newans = sympy.Interval.open(ans.inf,floor(ans.sup.evalf(3)*10**3)/10**3)
+                e_range = newans
+            else:
+                e_range = ans
             logging.debug(str(True))
-            logging.debug(sympy_interval_to_inequality(e_range,'e') +'\nの範囲で成立'+'\n')
+            logging.debug(sympy_interval_to_inequality(e_range,'e') +'\n の範囲で成立'+'\n')
             return True
     else:
         logging.debug(str(False)+'\n')
         return False
 
-def itv():
-    """
-    intervalクラスの更新
-    具体値はRationalで与える
-    """
-    global a,b,t
-    # a = Interval(Rational(1,10),Rational(1,10))
-    # t = Interval(0,50)
-    a = Interval(Rational(21,32),Rational(2081,3072))
-    t = Interval(0,Rational(1,2))
+def coeffs_to_poly(coeffs,var):
+    poly = sum(coeff * var **i for i, coeff in enumerate(coeffs))
+    return poly
 
-def main():
-    global t, degree_n, n, output_table, e_range, approach_interval
-
-    sym()
-    e_range = sympy.Interval(-oo,oo)
-    approach_value = 0
-    approach_interval = sympy.Interval.open(approach_value,approach_value+Rational(1,10**10))
-    # approach_interval = sympy.Interval.open(approach_value-Rational(1,10**10),approach_value)
-    # approach_interval = EmptySet
-    output_table = []
-    # ode = k*(1-x/L)*x
-    # ode = a*(1 - x/(500))*x
-    ode = -x**2
-    init = a
-    n = 5
-    print('dx/dt =',ode)
+def psa_varified(ode,init):
+    global e
 
     # 近似解の生成 
+    init_length = len(init)
     expr1 = picard(ode,init,n)
-    print('x(t) =',expand(expr1))
-    itv()
-    print('x(0) =',init,'\n')
-    sym()
+    for i in range(init_length):
+        print('d'+str(x[i])+'/dt = '+str(ode[i]))
+        print(str(x[i])+'(t) =',expand(expr1[x[i]]))
+        t,a,b,c = itv_list
+        print(str(x[i])+'('+str(t.upper*(div_num))+') =',str(init[i]),'=',eval(str(init[i])),'\n')
+        sym()
+        t,a,b,c = symbols('t a b c')
 
     # 解候補区間の生成
-    expr2 = expand(ode.subs(x,expr1),t)
-    coeffs = polynomial_coefficients(expr2,t)
-    itv()
-    ans = [0 for _ in range(len(coeffs))]
-    for i in range(len(coeffs)):
-        ans[len(coeffs)-i-1] = eval(str(coeffs[i]))
-    degree_n = Rational(1,n)*ans[n-1]
-    r = Interval.norm(degree_n+(Rational(1,n+1)*horner(ans[n:],t))*t-degree_n)
-    v_c = Interval.expand(degree_n + 2*r*Interval(-1,1))
-    tmp = v_c
+    expr2 = [0 for _ in range(init_length)]
+    coeffs = [0 for _ in range(init_length)]
+    for i in range(init_length):
+        expr2[i] = expand(ode[i].subs(expr1),t)
+        coeffs[i] = poly_to_coeffs(expr2[i],t)
+    Ans = [0 for _ in range(init_length)]
+    t,a,b,c = itv_list
+    for i in range(init_length):
+        ans = [0 for _ in range(len(coeffs[i]))]
+        for j in range(len(coeffs[i])):
+                if isinstance(coeffs[i][j],Rational):
+                    ans[j] = nsimplify(eval(str(coeffs[i][j])))
+                else:
+                    ans[j] = eval(str(coeffs[i][j]))
+        ans.reverse()
+        Ans[i] = ans
+    degree_n = [0 for _ in range(init_length)]
+    v_c = [0 for _ in range(10)]
+    for i in range(init_length):
+        if len(Ans[i]) < n:
+            degree_n[i] = 0
+        else:
+            degree_n[i] = Rational(1,n)*Ans[i][n-1]
+        if Ans[i][n:] == []:
+            r = Rational(1,10**(n-2))
+            v_c[i] = Interval.expand(degree_n[i] + 2*r*Interval(-1,1)) 
+        else:
+            r = Interval.norm((degree_n[i]+(Rational(1,n+1)*horner(Ans[i][n:],t))*t)-degree_n[i])
+            # r = Rational(1,10**(n-2))
+            if r.subs(e,0) == 0:
+                r = Rational(1,10**(n-1))
+            v_c[i] = Interval.expand(degree_n[i] + 2*r*Interval(-1,1)) 
+            coeffs_lower = poly_to_coeffs(v_c[i].lower,e)
+            coeffs_lower.reverse()
+            coeffs_lower = polynomial_continued_fraction(coeffs_lower,31)
+            coeffs_upper = poly_to_coeffs(v_c[i].upper,e)
+            coeffs_upper.reverse()
+            coeffs_upper = polynomial_continued_fraction(coeffs_upper,32)
+            v_c[i] = Interval(coeffs_to_poly(coeffs_lower,e),coeffs_to_poly(coeffs_upper,e))
+    tmp = v_c 
 
     # 解の精度保証  
     sym()
-    v_c = symbols('v_c')
-    expr3 = expand(ode.subs(x,(v_c*t**n+expr1-LT(expr1))),t)
-    coeffs = polynomial_coefficients(expr3,t)
-    tmp = Guaranteed_accuracy(tmp,coeffs)
-    if isinstance(tmp,Interval):
-        v_c = tmp
-        for i in range(0):
-            v_c = Guaranteed_accuracy(v_c,coeffs)
-            if isinstance(v_c,bool):
-                break
-    output_table = [[i + 1] + row for i, row in enumerate(output_table)]
-    output(output_table,1)
-    
-    # X(t.upper)の計算
-    if isinstance(tmp,Interval):
+    t,a,b,c = symbols('t a b c')
+    v_c = symbols('v_c0:10')
+    expr3 = [0 for _ in range(init_length)]
+    for i in range(init_length):
+        if degree(LT(expr1[x[i]]),t) == n:
+            expr1[x[i]] = v_c[i]*t**n+expr1[x[i]]-LT(expr1[x[i]])
+        else:
+            expr1[x[i]] = v_c[i]*t**n+expr1[x[i]]
+    for i in range(init_length):
+        expr3[i] = expand(ode[i].subs(expr1),t)
+        coeffs[i] = poly_to_coeffs(expr3[i],t)
+    print('----- 1 -----')
+    tmp = Guaranteed_accuracy(tmp,coeffs,degree_n)
+    if isinstance(tmp,bool):
+        return 0
+    else:
+        for i in range(1,3):
+            print('----- '+str(i+1)+' -----')
+            tmp = Guaranteed_accuracy(tmp,coeffs,degree_n)
+    print()
+
+    value = [0 for _ in range(init_length)]
+    for i in range(init_length):
+        sym()
+        t,a,b,c = symbols('t a b c')
+        coeffs[i] = poly_to_coeffs(expr1[x[i]],t)
+        t,a,b,c = itv_list
+        for j in range(1,n+1):
+            coeffs[i][j] = eval(str(coeffs[i][j]))
+        coeffs[i][0] = tmp[i]
+        coeffs[i].reverse()
+        out = dict()
+        for j,c in enumerate(coeffs[i]):
+            out[j] = c
+        # print(str(x[i])+'(t) =',out)
         t = Interval(t.upper,t.upper)
-        X = (Interval.expand(eval(str(expr1-LT(expr1)))+v_c*t**n))
-        print('x(' + str(t.upper) + ') =', X)
-        # print('width(x) =', Interval.width(X))
-        print('N(width(x)) =', N(limit(Interval.width(X),e,0)),'\n')
-        print(sympy_interval_to_inequality(e_range,'e')+'の範囲で成立'+'\n')
-        print(e_range.inf, ' = ', (e_range.inf).evalf(20))
-        print(e_range.sup, ' = ', (e_range.sup).evalf(20))
+        value[i] = Interval.expand(horner(coeffs[i],t))
+        value[i]
+        print(str(x[i])+'('+str(t.upper*(div_num+1))+') =',value[i])
+        # value_width = Interval.width(value[i])
+        # print('width('+str(x[i])+'('+str(t.upper)+'))','=',value_width,'=',value_width.evalf(20))
+        print()
 
+    print(sympy_interval_to_inequality(e_range,'e')+' の範囲で成立'+'\n')
+    print(sympy_interval_to_inequality(e_range,'e',True)+' の範囲で成立'+'\n')
+    
+    for i in range(init_length):
+        value_lower = poly_to_coeffs(value[i].lower,e)
+        value_upper = poly_to_coeffs(value[i].upper,e)
+        value_lower.reverse()
+        value_upper.reverse()
+        if e_range.sup.has(CRootOf):
+            e = Interval(e_range.inf,floor(e_range.sup.evalf(3)*10**3)/10**3)
+        else:
+            e = Interval(e_range.inf,e_range.sup)
+        if  len(value_lower) > 2:
+            value_lower_lower = horner(value_lower[1:],e).lower
+        elif len(value_lower) == 2:
+            value_lower_lower = value_lower[1]
+        else:
+            value_lower_lower = 0
+        if len(value_upper) > 2:
+            value_upper_upper = horner(value_upper[1:],e).upper
+        elif len(value_upper) == 2:
+            value_upper_upper = value_upper[1]
+        else:
+            value_upper_upper = 0
+        e = symbols('e',real=True)
+        coeffs_lower = [value_lower[0],value_lower_lower]
+        coeffs_upper = [value_upper[0],value_upper_upper]
+        coeffs_lower = polynomial_continued_fraction(coeffs_lower,31)
+        coeffs_upper = polynomial_continued_fraction(coeffs_upper,32)
+        value[i] = Interval(coeffs_lower[0]+coeffs_lower[1]*e,coeffs_upper[0]+coeffs_upper[1]*e)
+    return value
 
-if __name__ == "__main__":
+def sym():
+    """
+    symbolic変数の更新
+    """
+    global a,b,c,x,y,e,t
+    t,a,b,c,y = symbols('t a b c y')
+    e = Symbol('e', real = true)
+    x = symbols('x0:11')
+
+def main():
+    global e_range,approach_interval,n,itv_list,div_num
     # logging.basicConfig(level=logging.DEBUG, format='%(levelname)s: %(message)s')
-    main()
     sym()
-    e_range=sympy.Interval(0,oo)
-    approach_interval = 0
+    e_range = sympy.Interval(-oo,oo)
+    approach_interval = sympy.Interval.open(0,0+Rational(1,10**10))
+
+    t_start,t_end = 0,Rational(1,1)
+    ode = [-x[0]**2]
+    init = [a]
+    n = 4
+    div = 10
+    itv_list = [0,0,0,0] #t,a,b,c
+    itv_list[0] = Interval(0,Rational(t_end-t_start,div))
+    itv_list[1] = Interval(Rational(1,1),Rational(1,1))
+    itv_list[2] = Interval(0,0)
+    itv_list[3] = Interval(0,e)
+    ans = []
+    for div_num in range(div):
+        value = psa_varified(ode,init)
+        if isinstance(value,int):
+            return 0
+        for i in range(len(value)):
+            itv_list[i+1] = value[i]
+        ans.append(value)
+    print(ans[div-1][0].lower.evalf(30))
+    print(ans[div-1][0].upper.evalf(30))
+
+main()
+sym()
