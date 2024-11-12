@@ -7,6 +7,9 @@ import time
 import sys
 from continued_fraction import *
 
+FRACTION_LOWER_NUM = 11
+FRACTION_UPPER_NUM = 12
+
 class Interval:
     def __init__(self, lower, upper):
         self.lower = lower
@@ -198,7 +201,7 @@ def abs(expr):
     else:
         raise ValueError('abs_error'+'\n'+str(expr))
     
-def pprint(expr):
+# def pprint(expr):
     expr = str(expr)
     expr = expr.replace('**','^')
     expr = expr.replace('*','')
@@ -256,10 +259,10 @@ def Guaranteed_accuracy(v_c,coefficients,degree_n):
             v[i] = Interval.expand(degree_n[i]+(Rational(1,n+1)*horner(Ans[i][n:],t))*t)
             coeffs_lower = poly_to_coeffs(v[i].lower,e)
             coeffs_lower.reverse()
-            coeffs_lower = polynomial_continued_fraction(coeffs_lower,31)
+            coeffs_lower = polynomial_continued_fraction(coeffs_lower,FRACTION_LOWER_NUM)
             coeffs_upper = poly_to_coeffs(v[i].upper,e)
             coeffs_upper.reverse()
-            coeffs_upper = polynomial_continued_fraction(coeffs_upper,32)
+            coeffs_upper = polynomial_continued_fraction(coeffs_upper,FRACTION_UPPER_NUM)
             v[i] = Interval(coeffs_to_poly(coeffs_lower,e),coeffs_to_poly(coeffs_upper,e))
         print('v_c'+str(i),'= ',v_c[i])
         print(' v'+str(i),' = ',v[i])
@@ -336,9 +339,7 @@ def compare_polynomials(expr):
     logging.debug('expr = '+str(expr))
     comparison = str(expr.rel_op)
     expr = expand(expr.lhs - expr.rhs)
-    start = time.time()
     tmp1 = solve_poly_inequality(poly(expr,e),comparison)
-    end = time.time()
     if tmp1 == []:
         logging.debug(str(False)+'\n')
         return False
@@ -351,7 +352,6 @@ def compare_polynomials(expr):
             else:
                 if tmp != EmptySet:
                     ans = Union(ans,tmp)
-    logging.debug('time: '+str(end-start))
     logging.debug('ans = '+str(ans))
     if ans == EmptySet:
         logging.debug(str(False)+'\n')
@@ -362,7 +362,8 @@ def compare_polynomials(expr):
             return True
         else:
             if ans.sup.has(CRootOf):
-                newans = sympy.Interval.open(ans.inf,floor(ans.sup.evalf(3)*10**3)/10**3)
+                terms = continued_fraction(floor(ans.sup.evalf(30)*10**30),10**30)
+                newans = sympy.Interval.open(ans.inf,fraction_from_cf(terms[:31]))
                 e_range = newans
             else:
                 e_range = ans
@@ -426,10 +427,10 @@ def psa_varified(ode,init):
             v_c[i] = Interval.expand(degree_n[i] + 2*r*Interval(-1,1)) 
             coeffs_lower = poly_to_coeffs(v_c[i].lower,e)
             coeffs_lower.reverse()
-            coeffs_lower = polynomial_continued_fraction(coeffs_lower,31)
+            coeffs_lower = polynomial_continued_fraction(coeffs_lower,FRACTION_LOWER_NUM)
             coeffs_upper = poly_to_coeffs(v_c[i].upper,e)
             coeffs_upper.reverse()
-            coeffs_upper = polynomial_continued_fraction(coeffs_upper,32)
+            coeffs_upper = polynomial_continued_fraction(coeffs_upper,FRACTION_UPPER_NUM)
             v_c[i] = Interval(coeffs_to_poly(coeffs_lower,e),coeffs_to_poly(coeffs_upper,e))
     tmp = v_c 
 
@@ -469,13 +470,12 @@ def psa_varified(ode,init):
         out = dict()
         for j,c in enumerate(coeffs[i]):
             out[j] = c
-        # print(str(x[i])+'(t) =',out)
+        print(str(x[i])+'(t) =',out)
         t = Interval(t.upper,t.upper)
         value[i] = Interval.expand(horner(coeffs[i],t))
-        value[i]
         print(str(x[i])+'('+str(t.upper*(div_num+1))+') =',value[i])
-        # value_width = Interval.width(value[i])
-        # print('width('+str(x[i])+'('+str(t.upper)+'))','=',value_width,'=',value_width.evalf(20))
+        value_width = Interval.width(value[i])
+        print('width('+str(x[i])+'('+str(t.upper)+'))','=',value_width,'=',value_width.evalf(20))
         print()
 
     print(sympy_interval_to_inequality(e_range,'e')+' の範囲で成立'+'\n')
@@ -487,7 +487,7 @@ def psa_varified(ode,init):
         value_lower.reverse()
         value_upper.reverse()
         if e_range.sup.has(CRootOf):
-            e = Interval(e_range.inf,floor(e_range.sup.evalf(3)*10**3)/10**3)
+            e = Interval(e_range.inf,floor(e_range.sup.evalf(30)*10**30)/10**30)
         else:
             e = Interval(e_range.inf,e_range.sup)
         if  len(value_lower) > 2:
@@ -505,8 +505,8 @@ def psa_varified(ode,init):
         e = symbols('e',real=True)
         coeffs_lower = [value_lower[0],value_lower_lower]
         coeffs_upper = [value_upper[0],value_upper_upper]
-        coeffs_lower = polynomial_continued_fraction(coeffs_lower,31)
-        coeffs_upper = polynomial_continued_fraction(coeffs_upper,32)
+        coeffs_lower = polynomial_continued_fraction(coeffs_lower,FRACTION_LOWER_NUM)
+        coeffs_upper = polynomial_continued_fraction(coeffs_upper,FRACTION_UPPER_NUM)
         value[i] = Interval(coeffs_lower[0]+coeffs_lower[1]*e,coeffs_upper[0]+coeffs_upper[1]*e)
     return value
 
@@ -522,30 +522,44 @@ def sym():
 def main():
     global e_range,approach_interval,n,itv_list,div_num
     # logging.basicConfig(level=logging.DEBUG, format='%(levelname)s: %(message)s')
+    start = time.time()
     sym()
     e_range = sympy.Interval(-oo,oo)
     approach_interval = sympy.Interval.open(0,0+Rational(1,10**10))
 
     t_start,t_end = 0,Rational(1,1)
-    ode = [-x[0]**2]
+    ode = [x[0]]
     init = [a]
-    n = 4
-    div = 10
-    itv_list = [0,0,0,0] #t,a,b,c
+    n = int(sys.argv[1])
+    div = int(sys.argv[2])
+    itv_list = [0 for _ in range(4)] #t,a,b,c
     itv_list[0] = Interval(0,Rational(t_end-t_start,div))
-    itv_list[1] = Interval(Rational(1,1),Rational(1,1))
-    itv_list[2] = Interval(0,0)
-    itv_list[3] = Interval(0,e)
+    itv_list[1] = Interval(Rational(1,1)-e,Rational(1,1)+e)
+    itv_list[2] = Interval(1,1)
+    itv_list[3] = Interval(1,1)
     ans = []
     for div_num in range(div):
+        # print(div_num)
         value = psa_varified(ode,init)
         if isinstance(value,int):
             return 0
         for i in range(len(value)):
             itv_list[i+1] = value[i]
         ans.append(value)
-    print(ans[div-1][0].lower.evalf(30))
-    print(ans[div-1][0].upper.evalf(30))
+    f = open('FRACTION_LOWER_NUM=11.txt', 'a')
+    f.write('n = '+str(n)+', div = '+str(div)+', ode = '+str(ode)+', t_end = '+str(t_end)+'\n')
+    f.write(str(x[i])+'('+str(t_end)+') = '+str(ans[div-1][0])+'\n')
+    tmp = len(str(x[i])+'('+str(t_end)+') ')
+    tmp = ' '*tmp
+    f.write(tmp + '= ['+str(ans[div-1][0].lower.evalf(30))+', '+str(ans[div-1][0].upper.evalf(30))+']'+'\n')
+    tmp = Interval.width(ans[div-1][0])
+    f.write('width = '+str(tmp)+'\n')
+    f.write('      = '+str(tmp.evalf(30))+'\n')
+    f.write('e_range_sup = '+str(e_range.sup)+'\n')
+    f.write('            = '+str(e_range.sup.evalf(30))+'\n')
+    end = time.time()
+    time_diff = end - start
+    f.write('time:' + str(time_diff)+'\n'+'\n')
 
 main()
 sym()

@@ -1,76 +1,68 @@
+import sympy
 from sympy import *
-from sympy.abc import *
 
-x = symbols('x0:11')
-ode = [x[1],-x[0]] #x0'(t) = ode[0], x1'(t) = ode[1], ...
-init = [1,0]   #x0(0) = init[0], x1(0) = init[1], ...
-n = 4
+def rump():
+    a = 77617.0
+    b = 33096.0
+    a = int(a)
+    b = int(b)
+    c = 333.75*b**6 + a**2*(11*a**2*b**2-b**6-121*b**4-2)+5.5*b**8+a*1/(2*b)
+    print(c)
+    a = float(a)
+    b = float(b)
+    c = 333.75*b**6 + a**2*(11*a**2*b**2-b**6-121*b**4-2)+5.5*b**8+a*1/(2*b)
+    print(c)
+    a = Rational(a)
+    b = Rational(b)
+    c = Rational(33375,100)*b**6 + a**2*(11*a**2*b**2-b**6-121*b**4-2)+ Rational(55,10)*b**8+a*1/(2*b)
+    print(c.evalf())
 
-def picard(ode,init,deg): 
-    tmp = [0 for _ in range(len(init))]
-    n = deg
-    values = dict()
-    for i in range(len(init)):
-        values[x[i]] = init[i]
-
-
-    for i in range(n):
-        for j in range(len(init)):
-            tmp[j] = init[j] + integrate(ode[j].subs(values),t)
-        for j in range(len(init)):
-            while(degree(tmp[j],t)>i+1):
-                tmp[j] = tmp[j]-LT(tmp[j])
-            values[x[j]] = tmp[j]
-
-    return values
-
-def f(n):
-    print(n)
-    if n > 100:
-        return n-10
-    return f(f(n+11))
-
+def seven_square_sum(n):
+    n = Integer(n)
+    ans = 1/24*n**2*(n+1)**2*(3*n**4+6*n**3-n**2-4*n+2)
+    print(N(ans,100))
+    n = Float(n)
+    ans = 1/8*n**2*(n+1)**2*(n**4+2*n**3-n**2/3-4*n/3+2/3)
+    print(N(ans,100))
+    n = Rational(n,1)
+    ans = Rational(1,8)*n**2*(n+1)**2*(n**4+2*n**3-Rational(n**2,3)-Rational(4*n,3)+Rational(2,3))
+    print(ans)
+    ans = n**2*(n+1)**2*(3*n**4+6*n**3-n**2-4*n+2)*1/24
+    print(ans)
+    
 def continued_fraction(a, b):
     """
     連分数展開のアルゴリズム
     """
     terms = []
+    i = 0
     while b != 0:
         q = floor(a / b)
         terms.append(q)
         a, b = b, a - q * b
+        i += 1
+        if i == 101:
+            break
     return terms
 
-def fraction_from_cf(terms):
+def fraction_from_cf(terms,n):
     if not terms:
         return 0
-    frac = terms[-1]
-    for term in reversed(terms[:-1]):
+    frac = terms[n]
+    for term in reversed(terms[:n]):
         frac = term + 1 / frac
     return frac
 
-a = 31415926535897932384626433832795028841971
-b = 10000000000000000000000000000000000000000
-terms = continued_fraction(a, b)
-print(str(len(str(a)))+'桁','a =',a)
-print(str(len(str(b)))+'桁','b =',b)
-print('連分数表示',' 長さ',len(terms))
-print(terms)
-print()
-for i in range(len(terms)):
-    ans = fraction_from_cf(terms[:i+1])
-    print('打切',i+1)
-    print('近似',ans)
-    print('誤差',(ans-Rational(a,b)).evalf(30))
-    if (ans-Rational(a,b)) >= 0:
-        tmp = '+'
-    else:
-        tmp = '-'
-    print('正負',tmp)
-    print()
+def main():
+    a = 2**(Rational(1,3))
+    b = 1
+    terms = continued_fraction(a,b)
+    print(terms)
+    for n in range(len(terms)):
+        ans = fraction_from_cf(terms,n)
+        diff = (ans - a/b)/(a/b)
+        print(ans)
+        print(diff.evalf())
 
-# 0.499996184243842 - 4.48922186945969*e
-# 4.47074439125908*e + 0.50000315299614
-a = 12794935963538478830399/26895352859468526256128
-b = 1138012408557978581962263057189318521782674817/2170080016305965495537271176977755960772657152
-print(a,b)
+if __name__ == '__main__':
+    main()

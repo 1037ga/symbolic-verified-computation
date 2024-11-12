@@ -32,8 +32,8 @@ def polynomial_continued_fraction(coeffs,n):
     return coeffs
 
 if __name__ == '__main__':
-    a = 90909
-    b = 100000
+    a = 10975
+    b = 13979
     terms = continued_fraction(a, b)
     print(str(len(str(a)))+'桁','a =',a)
     print(str(len(str(b)))+'桁','b =',b)
