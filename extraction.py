@@ -11,7 +11,7 @@ def extraction(filename):
 
 if __name__ == "__main__":
     # ファイル名
-    filename = 'output7.txt'
+    filename = 'FRACTION_LOWER_NUM=31_2_1.txt'
     # 名前を抽出
     extracted_detas = extraction(filename)
     # 結果を出力

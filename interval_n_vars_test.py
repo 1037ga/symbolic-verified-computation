@@ -7,8 +7,8 @@ import time
 import sys
 from continued_fraction import *
 
-FRACTION_LOWER_NUM = 11
-FRACTION_UPPER_NUM = 12
+FRACTION_LOWER_NUM = 31
+FRACTION_UPPER_NUM = FRACTION_LOWER_NUM+1
 
 class Interval:
     def __init__(self, lower, upper):
@@ -528,7 +528,7 @@ def main():
     approach_interval = sympy.Interval.open(0,0+Rational(1,10**10))
 
     t_start,t_end = 0,Rational(1,1)
-    ode = [x[0]]
+    ode = [-x[0]**2]
     init = [a]
     n = int(sys.argv[1])
     div = int(sys.argv[2])
@@ -546,7 +546,7 @@ def main():
         for i in range(len(value)):
             itv_list[i+1] = value[i]
         ans.append(value)
-    f = open('FRACTION_LOWER_NUM=11.txt', 'a')
+    f = open('FRACTION_LOWER_NUM=31_2.txt', 'a')
     f.write('n = '+str(n)+', div = '+str(div)+', ode = '+str(ode)+', t_end = '+str(t_end)+'\n')
     f.write(str(x[i])+'('+str(t_end)+') = '+str(ans[div-1][0])+'\n')
     tmp = len(str(x[i])+'('+str(t_end)+') ')
